@@ -6,19 +6,19 @@
 
 CRGB leds[NUM_LEDS];
 
-//int brightness = 50; // jas (0-255)
-
-
-
 void setup() {
   FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, NUM_LEDS);
-  FastLED.setBrightness(255);
-
-  for(int i = 0; i < NUM_LEDS; i++) {
-    leds[i] = CRGB::White; // farba
-  }
-  FastLED.show();
+  FastLED.setBrightness(80);
 }
 
 void loop() {
+  for(int i = 0; i < NUM_LEDS; i++) {
+
+    fadeToBlackBy(leds, NUM_LEDS, 50);
+    
+    leds[i] = CRGB::White;  
+
+    FastLED.show();         
+    delay(100);            
+  }
 }
