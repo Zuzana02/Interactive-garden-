@@ -1,0 +1,28 @@
+#include <Arduino.h>
+#include <FastLED.h>
+
+#define LED_PIN 4
+#define NUM_LEDS 44
+
+CRGB leds[NUM_LEDS];
+
+void setup() {
+  FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, NUM_LEDS);
+  FastLED.clear();
+}
+
+void loop() {
+  for(int i = 0; i < NUM_LEDS; i++) {
+
+    // postupne zhasínanie všetkých LED (trail efekt)
+    for(int j = 0; j < NUM_LEDS; j++) {
+      leds[j].fadeToBlackBy(40); // čím väčšie číslo, tým rýchlejšie zhasína
+    }
+
+    // aktuálna LED sa rozsvieti naplno
+    leds[i] = CRGB::White;
+
+    FastLED.show();
+    delay(50); // rýchlosť pohybu
+  }
+}
