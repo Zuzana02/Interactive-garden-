@@ -1,13 +1,55 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>LED Control</title>
+    <title>Garden Canvas</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: sans-serif; text-align: center; background: #222; color: white; }
+        /* Vytvorenie mriežky 11 stĺpcov */
+        .grid { 
+            display: grid; 
+            grid-template-columns: repeat(11, 40px); 
+            gap: 5px; 
+            justify-content: center; 
+            margin-top: 20px; 
+        }
+        /* Štýl jednej LEDky na webe */
+        .led { 
+            width: 40px; 
+            height: 40px; 
+            background: #444; 
+            border-radius: 4px; 
+            cursor: pointer; 
+        }
+        /* Keď je LEDka na webe zapnutá */
+        .led.on { background: #fff; box-shadow: 0 0 10px #fff; }
+    </style>
 </head>
 <body>
-  <h1>Garden</h1>
+    <h1>Garden Canvas 🌿</h1>
+    <div class="grid" id="canvas"></div>
 
-  <button onclick="fetch('/on')">ON</button>
-  <button onclick="fetch('/off')">OFF</button>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const numLeds = 44;
 
+        // Vytvoríme 44 štvorčekov
+        for (let i = 0; i < numLeds; i++) {
+            const div = document.createElement('div');
+            div.className = 'led';
+            div.dataset.id = i;
+            div.onclick = () => toggleLed(i, div);
+            canvas.appendChild(div);
+        }
+
+        function toggleLed(id, element) {
+            const isNowOn = element.classList.toggle('on');
+            const state = isNowOn ? 1 : 0;
+
+            // Pošleme ESP32 info: /set?id=5&state=1
+            fetch(`/set?id=${id}&state=${state}`)
+                .then(response => console.log(`LED ${id} set to ${state}`));
+        }
+    </script>
 </body>
 </html>
