@@ -1,39 +1,55 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Garden Canvas</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Canvas</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
     <style>
-        body { font-family: sans-serif; text-align: center; background: #222; color: white; }
-        /* Vytvorenie mriežky 11 stĺpcov */
+        /* Reset margins and make body take full screen without scrolling */
+        body { 
+            margin: 0; 
+            padding: 0; 
+            background: #111; 
+            height: 100vh; 
+            width: 100vw; 
+            overflow: hidden; 
+            touch-action: manipulation; /* Prevents zooming on mobile devices */
+        }
+
+        /* Grid that dynamically fills the entire screen */
         .grid { 
             display: grid; 
-            grid-template-columns: repeat(11, 40px); 
-            gap: 5px; 
-            justify-content: center; 
-            margin-top: 20px; 
+            grid-template-columns: repeat(11, 1fr); /* 11 equal columns */
+            grid-template-rows: repeat(4, 1fr);    /* 4 equal rows */
+            gap: 8px;                              /* Space between LEDs */
+            width: 100%; 
+            height: 100%; 
+            padding: 8px;                          /* Padding around the edges */
+            box-sizing: border-box; 
         }
-        /* Štýl jednej LEDky na webe */
+
+        /* Style for individual LEDs */
         .led { 
-            width: 40px; 
-            height: 40px; 
-            background: #444; 
-            border-radius: 4px; 
+            background: #333; 
+            border-radius: 8px; 
             cursor: pointer; 
+            transition: background 0.1s, box-shadow 0.1s;
         }
-        /* Keď je LEDka na webe zapnutá */
-        .led.on { background: #fff; box-shadow: 0 0 10px #fff; }
+
+        /* Style when the LED is ON */
+        .led.on { 
+            background: #fff; 
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.8); 
+        }
     </style>
 </head>
 <body>
-    <h1>Garden Canvas 🌿</h1>
     <div class="grid" id="canvas"></div>
 
     <script>
         const canvas = document.getElementById('canvas');
         const numLeds = 44;
 
-        // Vytvoríme 44 štvorčekov
+        // Create the LED grid
         for (let i = 0; i < numLeds; i++) {
             const div = document.createElement('div');
             div.className = 'led';
@@ -46,9 +62,10 @@
             const isNowOn = element.classList.toggle('on');
             const state = isNowOn ? 1 : 0;
 
-            // Pošleme ESP32 info: /set?id=5&state=1
+            // Send HTTP request to ESP32
             fetch(`/set?id=${id}&state=${state}`)
-                .then(response => console.log(`LED ${id} set to ${state}`));
+                .then(response => console.log(`LED ${id} set to ${state}`))
+                .catch(error => console.error('Error:', error));
         }
     </script>
 </body>

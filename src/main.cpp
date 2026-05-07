@@ -15,17 +15,32 @@ void handleRoot() {
     file.close();
 }
 
-// NOVÁ FUNKCIA: Ovládanie konkrétnej LEDky
+// MAGIC FUNCTION: Translates logical web clicks to the physical zig-zag wiring
+int mapZigZag(int webId) {
+    int row = webId / 11; // Find out which of the 4 rows we are in (result 0, 1, 2, or 3)
+    int col = webId % 11; // Find out the position within the row (0 to 10)
+
+    if (row % 2 == 0) {
+        // Even rows (0 and 2) go normally from left to right
+        return webId; 
+    } else {
+        // Odd rows (1 and 3) go in reverse from right to left
+        return (row * 11) + (10 - col);
+    }
+}
+
 void handleSetLed() {
     if (server.hasArg("id") && server.hasArg("state")) {
-        int id = server.arg("id").toInt();
+        int webId = server.arg("id").toInt();
         int state = server.arg("state").toInt();
 
-        if (id >= 0 && id < NUM_LEDS) {
-            // Ak state = 1, biela, inak zhasnúť (čierna)
-            leds[id] = (state == 1) ? CRGB::White : CRGB::Black;
+        // Use the translator here!
+        int physicalId = mapZigZag(webId);
+
+        if (physicalId >= 0 && physicalId < NUM_LEDS) {
+            leds[physicalId] = (state == 1) ? CRGB::White : CRGB::Black;
             FastLED.show();
-            Serial.printf("Nastavujem LED %d na %s\n", id, state == 1 ? "ON" : "OFF");
+            Serial.printf("Web ID: %d -> Physical ID: %d set to %d\n", webId, physicalId, state);
         }
     }
     server.send(200, "text/plain", "OK");
@@ -38,15 +53,18 @@ void setup() {
     FastLED.clear();
     FastLED.show();
 
-    if(!LittleFS.begin()) { Serial.println("FS Error"); return; }
+    if(!LittleFS.begin()) { 
+        Serial.println("FS Error: Could not mount LittleFS"); 
+        return; 
+    }
 
     WiFi.softAP("MyGarden", "12345678");
     
     server.on("/", handleRoot);
-    server.on("/set", handleSetLed); // Registrácia novej cesty
+    server.on("/set", handleSetLed);
     
     server.begin();
-    Serial.println("Server bezi na 192.168.4.1");
+    Serial.println("Server is running at 192.168.4.1");
 }
 
 void loop() {
