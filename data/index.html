@@ -1,10 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Canvas</title>
+    <title>Garden Canvas</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
     <style>
-        /* Reset margins and make body take full screen without scrolling */
         body { 
             margin: 0; 
             padding: 0; 
@@ -12,33 +11,37 @@
             height: 100vh; 
             width: 100vw; 
             overflow: hidden; 
-            touch-action: manipulation; /* Prevents zooming on mobile devices */
+            /* Úplný zákaz pre iPad robiť gestá a označovať veci */
+            touch-action: none; 
+            -webkit-touch-callout: none;
+            -webkit-user-select: none; 
+            user-select: none;
         }
 
-        /* Grid that dynamically fills the entire screen */
         .grid { 
             display: grid; 
-            grid-template-columns: repeat(11, 1fr); /* 11 equal columns */
-            grid-template-rows: repeat(4, 1fr);    /* 4 equal rows */
-            gap: 8px;                              /* Space between LEDs */
+            grid-template-columns: repeat(11, 1fr); 
+            grid-template-rows: repeat(4, 1fr);    
+            gap: 8px;                              
             width: 100%; 
             height: 100%; 
-            padding: 8px;                          /* Padding around the edges */
+            padding: 8px;                          
             box-sizing: border-box; 
         }
 
-        /* Style for individual LEDs */
         .led { 
-            background: #333; 
+            background: #222; 
             border-radius: 8px; 
-            cursor: pointer; 
             transition: background 0.1s, box-shadow 0.1s;
+            /* Zabezpečí, že kurzor sa zmení a kocky nebudú "ťahateľné" ako obrázky */
+            cursor: pointer;
+            user-drag: none;
+            -webkit-user-drag: none;
         }
 
-        /* Style when the LED is ON */
         .led.on { 
             background: #fff; 
-            box-shadow: 0 0 15px rgba(255, 255, 255, 0.8); 
+            box-shadow: 0 0 20px rgba(255, 255, 255, 1); 
         }
     </style>
 </head>
@@ -48,24 +51,64 @@
     <script>
         const canvas = document.getElementById('canvas');
         const numLeds = 44;
+        const trailTime = 1000; // Zhasne po 1 sekunde
+        let isDrawing = false;
 
-        // Create the LED grid
+        // Vytvorenie mriežky a senzorov pre PC
         for (let i = 0; i < numLeds; i++) {
             const div = document.createElement('div');
             div.className = 'led';
             div.dataset.id = i;
-            div.onclick = () => toggleLed(i, div);
+            
+            // --- PC (Myš) ŠPECIFICKÉ SENZORY ---
+            div.addEventListener('mousedown', (e) => {
+                isDrawing = true;
+                activateLed(div);
+                e.preventDefault(); // Zablokuje natívne označovanie prehliadača
+            });
+            
+            div.addEventListener('mouseenter', () => {
+                if (isDrawing) activateLed(div);
+            });
+            
             canvas.appendChild(div);
         }
 
-        function toggleLed(id, element) {
-            const isNowOn = element.classList.toggle('on');
-            const state = isNowOn ? 1 : 0;
+        // PC: Zastavenie kreslenia, keď pustíš myš
+        document.addEventListener('mouseup', () => isDrawing = false);
+        document.addEventListener('mouseleave', () => isDrawing = false);
 
-            // Send HTTP request to ESP32
-            fetch(`/set?id=${id}&state=${state}`)
-                .then(response => console.log(`LED ${id} set to ${state}`))
-                .catch(error => console.error('Error:', error));
+        // --- iPAD A MOBIL (Dotyk) ŠPECIFICKÉ SENZORY ---
+        document.addEventListener('touchstart', (e) => {
+            e.preventDefault(); // Prísny zákaz scrollovania
+            handleTouch(e);
+        }, { passive: false });
+
+        document.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            handleTouch(e);
+        }, { passive: false });
+
+        function handleTouch(e) {
+            const touch = e.touches[0];
+            const element = document.elementFromPoint(touch.clientX, touch.clientY);
+            activateLed(element);
+        }
+
+        // Hlavná funkcia pre rozsvietenie (spoločná pre PC aj iPad)
+        function activateLed(element) {
+            if (element && element.classList.contains('led') && !element.classList.contains('on')) {
+                const id = element.dataset.id;
+                element.classList.add('on'); // Rozsvieť na webe
+                
+                // Pošli do ESP32
+                fetch(`/set?id=${id}&state=1`).catch(err => console.error(err));
+                
+                // Zhasni na webe po 3 sekundách
+                setTimeout(() => {
+                    element.classList.remove('on');
+                }, trailTime);
+            }
         }
     </script>
 </body>

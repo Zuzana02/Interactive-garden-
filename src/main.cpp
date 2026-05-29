@@ -7,6 +7,8 @@
 #define NUM_LEDS 44
 CRGB leds[NUM_LEDS];
 
+unsigned long ledTimeouts[NUM_LEDS] = {0};
+
 WebServer server(80);
 
 void handleRoot() {
@@ -15,16 +17,13 @@ void handleRoot() {
     file.close();
 }
 
-// MAGIC FUNCTION: Translates logical web clicks to the physical zig-zag wiring
 int mapZigZag(int webId) {
-    int row = webId / 11; // Find out which of the 4 rows we are in (result 0, 1, 2, or 3)
-    int col = webId % 11; // Find out the position within the row (0 to 10)
+    int row = webId / 11; 
+    int col = webId % 11; 
 
     if (row % 2 == 0) {
-        // Even rows (0 and 2) go normally from left to right
         return webId; 
     } else {
-        // Odd rows (1 and 3) go in reverse from right to left
         return (row * 11) + (10 - col);
     }
 }
@@ -34,13 +33,15 @@ void handleSetLed() {
         int webId = server.arg("id").toInt();
         int state = server.arg("state").toInt();
 
-        // Use the translator here!
         int physicalId = mapZigZag(webId);
 
         if (physicalId >= 0 && physicalId < NUM_LEDS) {
-            leds[physicalId] = (state == 1) ? CRGB::White : CRGB::Black;
-            FastLED.show();
-            Serial.printf("Web ID: %d -> Physical ID: %d set to %d\n", webId, physicalId, state);
+            if (state == 1) {
+                leds[physicalId] = CRGB::White;
+                // Nastavené presne na 3000 milisekúnd (3 sekundy)
+                ledTimeouts[physicalId] = millis() + 1000; 
+                FastLED.show();
+            }
         }
     }
     server.send(200, "text/plain", "OK");
@@ -69,4 +70,19 @@ void setup() {
 
 void loop() {
     server.handleClient();
+
+    unsigned long currentMillis = millis();
+    bool changeDetected = false;
+
+    for (int i = 0; i < NUM_LEDS; i++) {
+        if (ledTimeouts[i] != 0 && currentMillis > ledTimeouts[i]) {
+            leds[i] = CRGB::Black; 
+            ledTimeouts[i] = 0;    
+            changeDetected = true;
+        }
+    }
+
+    if (changeDetected) {
+        FastLED.show();
+    }
 }
