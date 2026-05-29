@@ -11,7 +11,6 @@
             height: 100vh; 
             width: 100vw; 
             overflow: hidden; 
-            /* Úplný zákaz pre iPad robiť gestá a označovať veci */
             touch-action: none; 
             -webkit-touch-callout: none;
             -webkit-user-select: none; 
@@ -32,16 +31,18 @@
         .led { 
             background: #222; 
             border-radius: 8px; 
-            transition: background 0.1s, box-shadow 0.1s;
-            /* Zabezpečí, že kurzor sa zmení a kocky nebudú "ťahateľné" ako obrázky */
             cursor: pointer;
             user-drag: none;
             -webkit-user-drag: none;
+            /* 1.5 sekundový pomalý fade-out do tmy */
+            transition: background 1.5s ease-out, box-shadow 1.5s ease-out;
         }
 
         .led.on { 
             background: #fff; 
             box-shadow: 0 0 20px rgba(255, 255, 255, 1); 
+            /* Okamžité rozsvietenie (žiadne čakanie) */
+            transition: background 0s, box-shadow 0s;
         }
     </style>
 </head>
@@ -51,43 +52,23 @@
     <script>
         const canvas = document.getElementById('canvas');
         const numLeds = 44;
-        const trailTime = 1000; // Zhasne po 1 sekunde
         let isDrawing = false;
 
-        // Vytvorenie mriežky a senzorov pre PC
         for (let i = 0; i < numLeds; i++) {
             const div = document.createElement('div');
             div.className = 'led';
             div.dataset.id = i;
             
-            // --- PC (Myš) ŠPECIFICKÉ SENZORY ---
-            div.addEventListener('mousedown', (e) => {
-                isDrawing = true;
-                activateLed(div);
-                e.preventDefault(); // Zablokuje natívne označovanie prehliadača
-            });
-            
-            div.addEventListener('mouseenter', () => {
-                if (isDrawing) activateLed(div);
-            });
-            
+            div.addEventListener('mousedown', (e) => { isDrawing = true; activateLed(div); e.preventDefault(); });
+            div.addEventListener('mouseenter', () => { if (isDrawing) activateLed(div); });
             canvas.appendChild(div);
         }
 
-        // PC: Zastavenie kreslenia, keď pustíš myš
         document.addEventListener('mouseup', () => isDrawing = false);
         document.addEventListener('mouseleave', () => isDrawing = false);
 
-        // --- iPAD A MOBIL (Dotyk) ŠPECIFICKÉ SENZORY ---
-        document.addEventListener('touchstart', (e) => {
-            e.preventDefault(); // Prísny zákaz scrollovania
-            handleTouch(e);
-        }, { passive: false });
-
-        document.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-            handleTouch(e);
-        }, { passive: false });
+        document.addEventListener('touchstart', (e) => { e.preventDefault(); handleTouch(e); }, { passive: false });
+        document.addEventListener('touchmove', (e) => { e.preventDefault(); handleTouch(e); }, { passive: false });
 
         function handleTouch(e) {
             const touch = e.touches[0];
@@ -95,19 +76,18 @@
             activateLed(element);
         }
 
-        // Hlavná funkcia pre rozsvietenie (spoločná pre PC aj iPad)
         function activateLed(element) {
             if (element && element.classList.contains('led') && !element.classList.contains('on')) {
                 const id = element.dataset.id;
-                element.classList.add('on'); // Rozsvieť na webe
                 
-                // Pošli do ESP32
+                element.classList.add('on'); 
                 fetch(`/set?id=${id}&state=1`).catch(err => console.error(err));
                 
-                // Zhasni na webe po 3 sekundách
+                // Zoberieme triedu 'on' preč takmer okamžite (po 50ms). 
+                // Tým sa spustí tá 1.5-sekundová CSS fade-out animácia!
                 setTimeout(() => {
                     element.classList.remove('on');
-                }, trailTime);
+                }, 50); 
             }
         }
     </script>

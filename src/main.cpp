@@ -7,8 +7,6 @@
 #define NUM_LEDS 44
 CRGB leds[NUM_LEDS];
 
-unsigned long ledTimeouts[NUM_LEDS] = {0};
-
 WebServer server(80);
 
 void handleRoot() {
@@ -37,10 +35,8 @@ void handleSetLed() {
 
         if (physicalId >= 0 && physicalId < NUM_LEDS) {
             if (state == 1) {
+                // Iba ju "rozsvietime" naplno. O zhasínanie sa postará loop()!
                 leds[physicalId] = CRGB::White;
-                // Nastavené presne na 3000 milisekúnd (3 sekundy)
-                ledTimeouts[physicalId] = millis() + 1000; 
-                FastLED.show();
             }
         }
     }
@@ -71,18 +67,11 @@ void setup() {
 void loop() {
     server.handleClient();
 
-    unsigned long currentMillis = millis();
-    bool changeDetected = false;
-
-    for (int i = 0; i < NUM_LEDS; i++) {
-        if (ledTimeouts[i] != 0 && currentMillis > ledTimeouts[i]) {
-            leds[i] = CRGB::Black; 
-            ledTimeouts[i] = 0;    
-            changeDetected = true;
-        }
-    }
-
-    if (changeDetected) {
+    // MAGICKÁ FASTLED ANIMÁCIA
+    EVERY_N_MILLISECONDS(30) { 
+        // Každých 30ms stiahni jas všetkých LEDiek o 15 (z 255)
+        // Čím menšie číslo (napr. 5), tým pomalšie to bude zhasínať
+        fadeToBlackBy(leds, NUM_LEDS, 15); 
         FastLED.show();
     }
 }
