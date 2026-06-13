@@ -4,7 +4,7 @@
 #include <LittleFS.h>
 
 #define LED_PIN 4
-#define NUM_LEDS 44
+#define NUM_LEDS 294
 CRGB leds[NUM_LEDS];
 
 WebServer server(80);
@@ -16,13 +16,13 @@ void handleRoot() {
 }
 
 int mapZigZag(int webId) {
-    int row = webId / 11; 
-    int col = webId % 11; 
+    int row = webId / 42; 
+    int col = webId % 42; 
 
     if (row % 2 == 0) {
         return webId; 
     } else {
-        return (row * 11) + (10 - col);
+        return (row * 42) + (41 - col);
     }
 }
 

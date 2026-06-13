@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Garden Canvas</title>
+    <title>Garden Canvas MAX</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
     <style>
         body { 
@@ -19,29 +19,29 @@
 
         .grid { 
             display: grid; 
-            grid-template-columns: repeat(11, 1fr); 
-            grid-template-rows: repeat(4, 1fr);    
-            gap: 8px;                              
+            grid-template-columns: repeat(42, 1fr); 
+            grid-template-rows: repeat(7, 1fr);    
+            gap: 2px;                              
             width: 100%; 
             height: 100%; 
-            padding: 8px;                          
+            padding: 4px;                          
             box-sizing: border-box; 
         }
 
         .led { 
             background: #222; 
-            border-radius: 8px; 
+            border-radius: 2px; /* Adjusted to 2px for the denser grid */
             cursor: pointer;
             user-drag: none;
             -webkit-user-drag: none;
-            /* 1.5 sekundový pomalý fade-out do tmy */
+            /* 1.5-second slow fade-out to dark */
             transition: background 1.5s ease-out, box-shadow 1.5s ease-out;
         }
 
         .led.on { 
             background: #fff; 
-            box-shadow: 0 0 20px rgba(255, 255, 255, 1); 
-            /* Okamžité rozsvietenie (žiadne čakanie) */
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.9); 
+            /* Instant turn-on (no delay) */
             transition: background 0s, box-shadow 0s;
         }
     </style>
@@ -51,7 +51,7 @@
 
     <script>
         const canvas = document.getElementById('canvas');
-        const numLeds = 44;
+        const numLeds = 294;
         let isDrawing = false;
 
         for (let i = 0; i < numLeds; i++) {
@@ -83,8 +83,8 @@
                 element.classList.add('on'); 
                 fetch(`/set?id=${id}&state=1`).catch(err => console.error(err));
                 
-                // Zoberieme triedu 'on' preč takmer okamžite (po 50ms). 
-                // Tým sa spustí tá 1.5-sekundová CSS fade-out animácia!
+                // Remove the 'on' class almost instantly (after 50ms). 
+                // This triggers the 1.5-second CSS fade-out animation!
                 setTimeout(() => {
                     element.classList.remove('on');
                 }, 50); 
