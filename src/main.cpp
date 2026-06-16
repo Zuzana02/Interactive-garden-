@@ -19,11 +19,25 @@ struct Ripple {
     float radius = 0;
     int centerX = -1;
     int centerY = -1;
+    bool ambient = false; // New flag to distinguish between user touch and background ambient ripples
 };
 
 Ripple ripples[MAX_RIPPLES];
 
+// --- STANDBY (AMBIENT) MODE CONFIGURATION ---
+unsigned long lastTouchTime = 0;
 
+// Idle timeout set to 10 seconds (10000 ms) for quick testing.
+// To make it 3 minutes, change this number to 180000.
+const unsigned long STANDBY_TIMEOUT = 10000; 
+bool isStandby = false;
+
+// Random crawler variables for the wandering light path
+float crawlerX = 21.0;
+float crawlerY = 3.5;
+float crawlerTargetX = 21.0;
+float crawlerTargetY = 3.5;
+// ------------------------------------------
 
 void handleRoot() {
     File file = LittleFS.open("/index.html", "r");
@@ -48,6 +62,10 @@ void handleSetLed() {
         
         int physicalId = mapZigZag(webId);
 
+        // --- WAKE UP FROM STANDBY ---
+        lastTouchTime = millis();
+        isStandby = false;
+
         if (physicalId >= 0 && physicalId < NUM_LEDS) {
             
             // MODE 1: DRAGGING (Draw single dot only) 
@@ -57,10 +75,8 @@ void handleSetLed() {
             
             // MODE 2: CLICKING (Trigger ripple wave) 
             else if (state == 2) {
-                // Additive blend for the starting point
                 leds[physicalId] += CRGB::White;
                 
-                // Find an available slot for a new ripple
                 int slot = -1;
                 for (int i = 0; i < MAX_RIPPLES; i++) {
                     if (!ripples[i].active) {
@@ -69,7 +85,6 @@ void handleSetLed() {
                     }
                 }
                 
-                // If all slots are full, override the oldest wave
                 if (slot == -1) {
                     float maxR = -1;
                     for (int i = 0; i < MAX_RIPPLES; i++) {
@@ -80,11 +95,11 @@ void handleSetLed() {
                     }
                 }
                 
-                // Start the new ripple animation in the found slot
                 ripples[slot].centerX = webId % 42;
                 ripples[slot].centerY = webId / 42;
                 ripples[slot].radius = 0;
                 ripples[slot].active = true;
+                ripples[slot].ambient = false; // Triggered by user, full brightness
             }
         }
     }
@@ -95,7 +110,6 @@ void setup() {
     Serial.begin(115200);
     FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, NUM_LEDS);
     
-    // Safety limit to prevent high current draw during testing
     FastLED.setBrightness(100); 
     FastLED.clear();
     FastLED.show();
@@ -109,25 +123,70 @@ void setup() {
     server.on("/", handleRoot);
     server.on("/set", handleSetLed);
     server.begin();
+
+    lastTouchTime = millis();
 }
 
 void loop() {
     server.handleClient();
 
+    // Check for inactivity to enter standby mode
+    if (millis() - lastTouchTime > STANDBY_TIMEOUT) {
+        isStandby = true;
+    }
+
     // Trigger animation frame every 30ms
     EVERY_N_MILLISECONDS(30) { 
         
+        // Always apply smooth fading to create organic tails for everything
         fadeToBlackBy(leds, NUM_LEDS, 12); 
         
-        // Scale factor for circle (rows are 7cm apart, LEDs are 1cm apart)
+        // --- STANDBY EXCLUSIVE GENERATORS ---
+        if (isStandby) {
+            
+            // 1. RANDOM CRAWLER (The wandering path of light)
+            // Smoothly interpolate towards the current random target
+            crawlerX += (crawlerTargetX - crawlerX) * 0.04;
+            crawlerY += (crawlerTargetY - crawlerY) * 0.04;
+
+            // If close to target, pick a new random destination on the grid
+            if (abs(crawlerTargetX - crawlerX) < 1.0 && abs(crawlerTargetY - crawlerY) < 1.0) {
+                crawlerTargetX = random(0, 42);
+                crawlerTargetY = random(0, 7);
+            }
+
+            // Constrain and map the crawler to inject soft, gentle light
+            int cx = constrain((int)crawlerX, 0, 41);
+            int cy = constrain((int)crawlerY, 0, 6);
+            leds[mapZigZag(cy * 42 + cx)] += CRGB(25, 25, 25); // Very soft glow
+
+            // 2. RANDOM BACKGROUND RIPPLES (Raindrops)
+            // Approx. 1 in 100 chance every frame (~every 3 seconds) to spawn an ambient wave
+            if (random(0, 100) == 0) {
+                int slot = -1;
+                for (int i = 0; i < MAX_RIPPLES; i++) {
+                    if (!ripples[i].active) {
+                        slot = i;
+                        break;
+                    }
+                }
+                if (slot != -1) {
+                    ripples[slot].centerX = random(0, 42);
+                    ripples[slot].centerY = random(0, 7);
+                    ripples[slot].radius = 0;
+                    ripples[slot].active = true;
+                    ripples[slot].ambient = true; // Mark as ambient for low brightness
+                }
+            }
+        }
+        
+        // --- UNIVERSAL RIPPLE RENDERER (Processes both User and Ambient waves) ---
         float Y_SCALE = 7.0;
 
         for (int i = 0; i < MAX_RIPPLES; i++) {
-            
             if (ripples[i].active) {
-                
-                // Smooth, steady wave expansion
-                ripples[i].radius += 0.3; 
+
+                ripples[i].radius += 0.25; 
 
                 if (ripples[i].radius > 60) { 
                     ripples[i].active = false;
@@ -143,18 +202,21 @@ void loop() {
 
                         float diff = abs(distance - ripples[i].radius);
                         
-                        // --- MAGIC NUMBER 2: SOFT WAVE FRONT ---
-                        // Only add light to LEDs that are exactly on the wave's edge (thickness 1.5).
-                        // We don't force them to turn off anymore, the fadeToBlackBy handles that.
-                        if (diff < 1.5) {
+                        float maxDiff = 1.0 + (ripples[i].radius * 0.05);
+                        if (maxDiff > 4.0) maxDiff = 4.0; 
+
+                        if (diff < maxDiff) {
                             int currentWebId = (y * 42) + x;
                             int physId = mapZigZag(currentWebId);
                             
-                            // Linear, soft brightness based on how close it is to the exact radius line
-                            float intensity = 1.0 - (diff / 1.5);
-                            int brightness = 150 * intensity;
+                            float intensity = 1.0 - (diff / maxDiff);
+                            intensity = intensity * intensity * intensity; 
                             
-                            // Additively blend the light ("charge" the LED up)
+                            // Set maximum brightness based on the ripple type
+                            // Ambient background ripples are capped at 35 for a very subtle effect
+                            int maxBrightness = ripples[i].ambient ? 35 : 150;
+                            int brightness = maxBrightness * intensity;
+                            
                             leds[physId] += CRGB(brightness, brightness, brightness); 
                         }
                     }
