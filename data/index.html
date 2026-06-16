@@ -5,43 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
     <style>
         body { 
-            margin: 0; 
-            padding: 0; 
-            background: #111; 
-            height: 100vh; 
-            width: 100vw; 
-            overflow: hidden; 
-            touch-action: none; 
-            -webkit-touch-callout: none;
-            -webkit-user-select: none; 
-            user-select: none;
+            margin: 0; padding: 0; background: #111; height: 100vh; width: 100vw; 
+            overflow: hidden; touch-action: none; -webkit-touch-callout: none; 
+            -webkit-user-select: none; user-select: none;
         }
-
         .grid { 
-            display: grid; 
-            grid-template-columns: repeat(42, 1fr); 
-            grid-template-rows: repeat(7, 1fr);    
-            gap: 2px;                              
-            width: 100%; 
-            height: 100%; 
-            padding: 4px;                          
-            box-sizing: border-box; 
+            display: grid; grid-template-columns: repeat(42, 1fr); grid-template-rows: repeat(7, 1fr);    
+            gap: 2px; width: 100%; height: 100%; padding: 4px; box-sizing: border-box; 
         }
-
         .led { 
-            background: #222; 
-            border-radius: 2px; /* Adjusted to 2px for the denser grid */
-            cursor: pointer;
-            user-drag: none;
-            -webkit-user-drag: none;
-            /* 1.5-second slow fade-out to dark */
+            background: #222; border-radius: 2px; cursor: pointer; user-drag: none; -webkit-user-drag: none;
             transition: background 1.5s ease-out, box-shadow 1.5s ease-out;
         }
-
         .led.on { 
-            background: #fff; 
-            box-shadow: 0 0 15px rgba(255, 255, 255, 0.9); 
-            /* Instant turn-on (no delay) */
+            background: #fff; box-shadow: 0 0 15px rgba(255, 255, 255, 0.9); 
             transition: background 0s, box-shadow 0s;
         }
     </style>
@@ -52,42 +29,89 @@
     <script>
         const canvas = document.getElementById('canvas');
         const numLeds = 294;
+        
         let isDrawing = false;
+        let hasDragged = false;
+        let startElement = null; 
+        let lastDraggedId = null; // NOVÁ PREMENNÁ: Pamätá si poslednú ťahanú kocku
 
         for (let i = 0; i < numLeds; i++) {
             const div = document.createElement('div');
             div.className = 'led';
             div.dataset.id = i;
-            
-            div.addEventListener('mousedown', (e) => { isDrawing = true; activateLed(div); e.preventDefault(); });
-            div.addEventListener('mouseenter', () => { if (isDrawing) activateLed(div); });
             canvas.appendChild(div);
         }
 
-        document.addEventListener('mouseup', () => isDrawing = false);
-        document.addEventListener('mouseleave', () => isDrawing = false);
+        // --- MOUSE CONTROLS ---
+        canvas.addEventListener('mousedown', (e) => {
+            if (e.target.classList.contains('led')) {
+                isDrawing = true;
+                hasDragged = false;
+                startElement = e.target;
+            }
+            e.preventDefault();
+        });
 
-        document.addEventListener('touchstart', (e) => { e.preventDefault(); handleTouch(e); }, { passive: false });
-        document.addEventListener('touchmove', (e) => { e.preventDefault(); handleTouch(e); }, { passive: false });
+        canvas.addEventListener('mousemove', (e) => {
+            if (isDrawing && e.target.classList.contains('led')) {
+                hasDragged = true;
+                activateLed(e.target, 1); 
+            }
+        });
 
-        function handleTouch(e) {
+        window.addEventListener('mouseup', () => {
+            if (isDrawing && !hasDragged && startElement) {
+                activateLed(startElement, 2); 
+            }
+            isDrawing = false;
+            startElement = null;
+            lastDraggedId = null; // Reset pri pustení
+        });
+
+        // --- TOUCH CONTROLS ---
+        canvas.addEventListener('touchstart', (e) => {
             const touch = e.touches[0];
             const element = document.elementFromPoint(touch.clientX, touch.clientY);
-            activateLed(element);
-        }
+            if (element && element.classList.contains('led')) {
+                isDrawing = true;
+                hasDragged = false;
+                startElement = element;
+            }
+        }, { passive: false });
 
-        function activateLed(element) {
-            if (element && element.classList.contains('led') && !element.classList.contains('on')) {
+        canvas.addEventListener('touchmove', (e) => {
+            if (!isDrawing) return;
+            e.preventDefault();
+            hasDragged = true;
+            const touch = e.touches[0];
+            const element = document.elementFromPoint(touch.clientX, touch.clientY);
+            activateLed(element, 1); 
+        }, { passive: false });
+
+        window.addEventListener('touchend', () => {
+            if (isDrawing && !hasDragged && startElement) {
+                activateLed(startElement, 2); 
+            }
+            isDrawing = false;
+            startElement = null;
+            lastDraggedId = null; // Reset pri pustení
+        });
+
+        // --- DATA TRANSMISSION ---
+        function activateLed(element, state) {
+            if (element && element.classList.contains('led')) {
                 const id = element.dataset.id;
+
+                // OCHRANA PROTI LAGOM: Ak ťaháme (state=1) a prst je stále na rovnakej kocke, ignoruj to!
+                if (state === 1 && id === lastDraggedId) return;
                 
+                // Zápis do pamäte, že túto kocku sme už vybavili
+                if (state === 1) lastDraggedId = id;
+
                 element.classList.add('on'); 
-                fetch(`/set?id=${id}&state=1`).catch(err => console.error(err));
+                fetch(`/set?id=${id}&state=${state}`).catch(err => console.error(err));
                 
-                // Remove the 'on' class almost instantly (after 50ms). 
-                // This triggers the 1.5-second CSS fade-out animation!
-                setTimeout(() => {
-                    element.classList.remove('on');
-                }, 50); 
+                setTimeout(() => { element.classList.remove('on'); }, 50); 
             }
         }
     </script>
