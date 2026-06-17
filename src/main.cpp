@@ -19,7 +19,7 @@ struct Ripple {
     float radius = 0;
     int centerX = -1;
     int centerY = -1;
-    bool ambient = false; // New flag to distinguish between user touch and background ambient ripples
+    bool ambient = false; // Flag to distinguish between user touch and background ambient ripples
 };
 
 Ripple ripples[MAX_RIPPLES];
@@ -40,6 +40,11 @@ float crawlerTargetY = 3.5;
 // ------------------------------------------
 
 void handleRoot() {
+    // ANTI-CACHE HEADERS: Forces the browser to always download the freshest HTML file
+    server.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    server.sendHeader("Pragma", "no-cache");
+    server.sendHeader("Expires", "0");
+
     File file = LittleFS.open("/index.html", "r");
     server.streamFile(file, "text/html");
     file.close();
@@ -145,23 +150,19 @@ void loop() {
         if (isStandby) {
             
             // 1. RANDOM CRAWLER (The wandering path of light)
-            // Smoothly interpolate towards the current random target
             crawlerX += (crawlerTargetX - crawlerX) * 0.04;
             crawlerY += (crawlerTargetY - crawlerY) * 0.04;
 
-            // If close to target, pick a new random destination on the grid
             if (abs(crawlerTargetX - crawlerX) < 1.0 && abs(crawlerTargetY - crawlerY) < 1.0) {
                 crawlerTargetX = random(0, 42);
                 crawlerTargetY = random(0, 7);
             }
 
-            // Constrain and map the crawler to inject soft, gentle light
             int cx = constrain((int)crawlerX, 0, 41);
             int cy = constrain((int)crawlerY, 0, 6);
             leds[mapZigZag(cy * 42 + cx)] += CRGB(25, 25, 25); // Very soft glow
 
             // 2. RANDOM BACKGROUND RIPPLES (Raindrops)
-            // Approx. 1 in 100 chance every frame (~every 3 seconds) to spawn an ambient wave
             if (random(0, 100) == 0) {
                 int slot = -1;
                 for (int i = 0; i < MAX_RIPPLES; i++) {
@@ -180,7 +181,7 @@ void loop() {
             }
         }
         
-        // --- UNIVERSAL RIPPLE RENDERER (Processes both User and Ambient waves) ---
+        // --- UNIVERSAL RIPPLE RENDERER ---
         float Y_SCALE = 7.0;
 
         for (int i = 0; i < MAX_RIPPLES; i++) {
@@ -212,8 +213,6 @@ void loop() {
                             float intensity = 1.0 - (diff / maxDiff);
                             intensity = intensity * intensity * intensity; 
                             
-                            // Set maximum brightness based on the ripple type
-                            // Ambient background ripples are capped at 35 for a very subtle effect
                             int maxBrightness = ripples[i].ambient ? 35 : 150;
                             int brightness = maxBrightness * intensity;
                             
